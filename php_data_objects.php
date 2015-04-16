@@ -37,8 +37,8 @@
  *     .html#follow-field-naming-conventions
  */
   
-  include_once 'get_post_parameter_fields_values.php';
-  
+include_once 'get_post_parameter_fields_values.php';
+
     /**
      * Creates a new connection to a MySQL database
      * <p>
@@ -60,6 +60,7 @@
      */
     function connectDatabase($mDatabaseName, $mServerName, $mUsername,
             $mPassword) {
+        $mPdoException = '';
         
         try {
             //Open a new PDO Connection
@@ -68,16 +69,17 @@
             //Set the PDO error mode to exception
             $mConnection->setAttribute(PDO::ATTR_ERRMODE,
                     PDO::ERRMODE_EXCEPTION);
-            
-            //unset() destroys the specified variables.
+        } catch(PDOException $mPdoException) {
+            return handleExceptions($mPdoException->getMessage());            
+        } finally {
             unset($mDatabaseName);
             unset($mServerName);
             unset($mUsername);
             unset($mPassword);
-            
-            return $mConnection;
-        } catch (PDOException $mPdoException) {
-            handlePdoExceptions($mPdoException->getMessage());            
+            if(empty($mPdoException)) {
+                unset($mPdoException);
+                return $mConnection;
+            }
         }
     }
     
@@ -110,7 +112,7 @@
      *             'key3' => value3,
      *             'key4' => value4,
      *     );                
-     *     insertIntoDatabase($connection, $tableName, $postParameter);
+     *     insertOneIntoDatabase($connection, $tableName, $postParameter);
      * } catch (PDOException $pdoException) {
      *     handlePdoExceptions($pdoException->getMessage()); 
      * } finally {
@@ -121,7 +123,7 @@
      * @param type $mTableName
      * @param type $mPostParameter
      */
-    function insertOneIntoDatabase($mConnection, $mTableName, $mPostParameter) {        
+    function insertOneIntoDatabase($mConnection, $mTableName, $mPostParameter) {
         try {
             //prepare sql
             $mStatement = $mConnection->prepare("INSERT INTO $mTableName (" 
@@ -161,7 +163,7 @@
      *     try {
      *         $connection = connectDatabase('databaseName', 'serverName'
      *                 , 'username', 'password');
-     *         deleteFromDatabase($connection, 'tableName', $postParameter);
+     *         deleteOneFromDatabase($connection, 'tableName', $postParameter);
      *     } catch (PDOException $pdoException) {
      *         handlePdoExceptions($pdoException->getMessage()); 
      *     } finally {
@@ -172,7 +174,7 @@
      * @param type $mTableName
      * @param type $mPostParameter
      */
-    function deleteFromDatabase($mConnection, $mTableName, $mPostParameter) {
+    function deleteOneFromDatabase($mConnection, $mTableName, $mPostParameter) {
         try {
             //prepare sql
             $mStatement = $mConnection->prepare("DELETE FROM $mTableName WHERE"
@@ -248,7 +250,7 @@
             unset($mTableName);
             unset($mPostParameter);
             
-            return var_dump($mStatement->fetch());
+            return $mStatement->fetch();
         } catch(PDOException $mPdoException) {
             handlePdoExceptions($mPdoException->getMessage());
         } finally {
@@ -324,18 +326,21 @@
         try {
             //prepare sql
             $mStatement = $mConnection->prepare('UPDATE ' . $mTableName 
-                    . 'SET ' . getFields($mPostParameter) . '=' 
-                    . getBindFields($mPostParameter) . 'WHERE ' . $mWhereColumn 
-                    . '=' . $mWhereValue);
+                    . ' SET ' . getFields($mPostParameter) 
+                    . '=' . getBindFields($mPostParameter) . ' WHERE ' 
+                    . $mWhereColumn . '=\'' . $mWhereValue . '\'');
 
             //bind parameters
             $mKey = $mValue = null;
             foreach($mPostParameter as $mKey => $mValue) {
                 $mStatement->bindValue(':' . $mKey, $mValue);
             } 
-
+            
             $mStatement->execute(); 
-
+            
+            //Check to see if update was successful. If 0, failed.
+            return $mStatement->rowCount();
+            
             //unset() destroys the specified variables.
             unset($mKey);
             unset($mValue);
@@ -346,6 +351,88 @@
             handlePdoExceptions($mPdoException->getMessage());
         } finally {
             unset($mStatement);
+        }
+    }
+    
+    /**
+     * Checks if specified database exists, returns boolean.
+     * <p>
+     * Example code:
+     *     if(php_data_objects_databaseExists($databaseName, $serverName,
+     *             $databaseUsername, $databasePassword)) {
+     *         //TODO: Database exists.
+     *     } else {
+     *         //TODO: Database does not exist.
+     *     }
+     * <p>
+     * @param string $mDatabaseName
+     * @param string $mServerName
+     * @param string $mDatabaseUsername
+     * @param string $mDatabasePassword
+     * @return boolean
+     */
+    function php_data_objects_databaseExists($mDatabaseName, $mServerName,
+            $mDatabaseUsername, $mDatabasePassword) {
+        try {
+            $mDatabaseExists = connectDatabase($mDatabaseName, $mServerName,
+                    $mDatabaseUsername, $mDatabasePassword);
+            if(is_string($mDatabaseExists)) {
+                return FALSE;              
+            } else {
+                return TRUE;
+            }
+        } catch(PDOException $mPdoException) {
+            //echo $mPdoException->getMessage();
+        } finally {
+            unset($mDatabaseName);
+            unset($mServerName);
+            unset($mDatabaseUsername);
+            unset($mDatabasePassword);
+            unset($mPdoException);
+            unset($mDatabaseExists);
+        }
+    }
+    
+    /**
+     * Checks if specified table exists, returns boolean.
+     * <p>
+     * Example code:
+     *     if(php_data_objects_tableExists($databaseName, $mTableName, 
+     *             $serverName, $databaseUsername, $databasePassword)) {
+     *         //TODO: Table exists.
+     *     } else {
+     *         //TODO: Table does not exist.
+     *     }
+     * @param string $mDatabaseName
+     * @param string $mTableName
+     * @param string $mServerName
+     * @param string $mDatabaseUsername
+     * @param string $mDatabasePassword
+     * @return boolean
+     */
+    function php_data_objects_tableExists($mDatabaseName, $mTableName, 
+            $mServerName, $mDatabaseUsername, $mDatabasePassword) {
+        $mPdoException = NULL;
+        try {
+            $mConnection = connectDatabase($mDatabaseName, $mServerName,
+                    $mDatabaseUsername, $mDatabasePassword);
+            $mStatement = $mConnection->prepare('SELECT 1 FROM ' 
+                    . $mTableName . ' LIMIT 1');
+            $mStatement->execute();
+        } catch(PDOException $mPdoException) {
+            return FALSE;
+        } finally {
+            unset($mDatabaseName);
+            unset($mTableName);
+            unset($mServerName);
+            unset($mDatabaseUsername);
+            unset($mDatabasePassword);
+            unset($mStatement);
+            unset($mConnection);
+            if($mPdoException === NULL) {
+                unset($mPdoException);
+                return TRUE;
+            }
         }
     }
     
@@ -383,7 +470,7 @@
      * 
      * @param type $mPdoException
      */
-    function handlePdoExceptions($mPdoException) {        
+    function handleExceptions($mPdoException) {        
         if(strpos($mPdoException, "SQLSTATE[23000]") !== false) {
             echo "Error: Duplicate entry.<br>";
             if(strpos($mPdoException, "'subject'") !== false) {
