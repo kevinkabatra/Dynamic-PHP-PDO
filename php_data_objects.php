@@ -105,27 +105,46 @@ include_once 'get_post_parameter_fields_values.php';
     function php_data_objects_createTable($mDatabaseName, 
             $mServerName,$mDatabaseUsername, $mDatabasePassword, $mTableName,
             $mSql) {
-        if(!php_data_objects_tableExists($mDatabaseName, $mTableName,
-                $mServerName, $mDatabaseUsername, $mDatabasePassword)) {
-            try {
-                $mConnection = connectDatabase($mDatabaseName, $mServerName,
-                        $mDatabaseUsername, $mDatabasePassword);
-                if(gettype($mConnection) !== 'string') {
-                    $mStatement = $mConnection->prepare(
-                            "CREATE TABLE $mTableName ($mSql)");
-                    $mStatement->execute();        
-                }
-            } catch(PDOException $mPdoException) {
-                handleExceptions($mPdoException->getMessage());
-            } finally {
-                if(empty($mPdoException)) {
-                    return TRUE;
+        try {
+            $mTableExists = php_data_objects_tableExists($mDatabaseName,
+                    $mTableName, $mServerName, $mDatabaseUsername,
+                    $mDatabasePassword);
+            //Test database connection
+            if(gettype($mTableExists) !== 'string') {
+                if(!$mTableExists) {
+                    try {
+                        $mConnection = connectDatabase($mDatabaseName,
+                                $mServerName, $mDatabaseUsername,
+                                $mDatabasePassword);
+                        /*
+                         * $mConnection at this point should never be a string,
+                         * due to same code being called in 
+                         * php_data_objects_tableExists(). 
+                         */
+                        if(gettype($mConnection) !== 'string') {
+                            $mStatement = $mConnection->prepare(
+                                    "CREATE TABLE $mTableName ($mSql)");
+                            $mStatement->execute();        
+                        } else {
+                            return $mConnection;
+                        }
+                    } catch(PDOException $mPdoException) {
+                        handleExceptions($mPdoException->getMessage());
+                    } finally {
+                        if(empty($mPdoException)) {
+                            return TRUE;
+                        } else {
+                            return FALSE;
+                        }
+                    }
                 } else {
-                    return FALSE;
+                    return FALSE; //table exists
                 }
-            }
-        } else {
-            return FALSE;
+            } else {
+                return $mTableExists; //table does not exist
+            }    
+        } catch (PDOException $mPdoException) {
+            handleExceptions($mPdoException->getMessage());
         }
     }
     
@@ -462,23 +481,31 @@ include_once 'get_post_parameter_fields_values.php';
         try {
             $mConnection = connectDatabase($mDatabaseName, $mServerName,
                     $mDatabaseUsername, $mDatabasePassword);
-            $mStatement = $mConnection->prepare('SELECT 1 FROM ' 
+            if(gettype($mConnection) !== 'string') {
+                $mStatement = $mConnection->prepare('SELECT 1 FROM ' 
                     . $mTableName . ' LIMIT 1');
-            $mStatement->execute();
-        } catch(PDOException $mPdoException) {
-            return FALSE;
+                $mStatement->execute();
+            } else {
+                $mPdoException = $mConnection;
+                return $mConnection;
+            }
+        } catch(PDOException $mPdoException) {           
+            return FALSE; //table does not exist
         } finally {
             unset($mDatabaseName);
             unset($mTableName);
             unset($mServerName);
             unset($mDatabaseUsername);
             unset($mDatabasePassword);
-            unset($mStatement);
-            unset($mConnection);
+            unset($mStatement);            
             if($mPdoException === NULL) {
                 unset($mPdoException);
-                return TRUE;
+                //unset($mConnection);
+                return TRUE; //table exists
+            } else {
+                //unset($mConnection);
             }
+            
         }
     }
             
@@ -531,11 +558,13 @@ include_once 'get_post_parameter_fields_values.php';
         if(strpos($mPdoException, "SQLSTATE[28000]") !== false) {
             //TODO: Provide logging to a developer console
             //critical error, the database did not log in using username and password
+            return 'Error[28000]: Could not authenticate username and password';
         }
         
         if(strpos($mPdoException, "SQLSTATE[42000]") !== false) {
             //TODO: Provide logging to a developer console
             //You have an error in your SQL syntax
+            return 'Error[42000]: Could not establish connection with database.';
         }
         return $mPdoException;
     }
