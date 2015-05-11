@@ -84,6 +84,52 @@ include_once 'get_post_parameter_fields_values.php';
     }
     
     /**
+     * Creates a new table in a database.
+     * <p>
+     * Example Code:
+     *     if(php_data_objects_createTable('databaseName', 'serverName',
+     *             'databaseUsername', 'databasePassword', 'tableName',
+     *             'firstName VARCHAR(30)')) {
+     *         //Table created successfully
+     *     } else {
+     *         //Table creation failed
+     *     }
+     * <p>
+     * @param string $mDatabaseName - Username for database.
+     * @param string $mServerName - Name or ip of server.
+     * @param string $mDatabasePassword - Password for database.
+     * @param string $mTableName - Name of table to be created.
+     * @param string $mSql - SQL code to generate Columns, Datatypes, etc.
+     * @return binary - TRUE if table creation is successful, else FALSE.
+     */
+    function php_data_objects_createTable($mDatabaseName, 
+            $mServerName,$mDatabaseUsername, $mDatabasePassword, $mTableName,
+            $mSql) {
+        if(!php_data_objects_tableExists($mDatabaseName, $mTableName,
+                $mServerName, $mDatabaseUsername, $mDatabasePassword)) {
+            try {
+                $mConnection = connectDatabase($mDatabaseName, $mServerName,
+                        $mDatabaseUsername, $mDatabasePassword);
+                if(gettype($mConnection) !== 'string') {
+                    $mStatement = $mConnection->prepare(
+                            "CREATE TABLE $mTableName ($mSql)");
+                    $mStatement->execute();        
+                }
+            } catch(PDOException $mPdoException) {
+                handleExceptions($mPdoException->getMessage());
+            } finally {
+                if(empty($mPdoException)) {
+                    return TRUE;
+                } else {
+                    return FALSE;
+                }
+            }
+        } else {
+            return FALSE;
+        }
+    }
+    
+    /**
      * Used to get the ID of the last inserted/updated record, requires 
      * an AUTO_INCREMENT field.
      * <p>
@@ -134,7 +180,7 @@ include_once 'get_post_parameter_fields_values.php';
             $mKey = $mValue = null;
             foreach($mPostParameter as $mKey => $mValue) {
                 $mStatement->bindValue(':' . $mKey, $mValue);
-            }            
+            }
             
             //row insertion
             $mStatement->execute();
@@ -435,7 +481,7 @@ include_once 'get_post_parameter_fields_values.php';
             }
         }
     }
-    
+            
     /**
      * 
      * @param type $mPostParameter
