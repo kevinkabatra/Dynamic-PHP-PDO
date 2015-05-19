@@ -1,3 +1,5 @@
+@Deprecated - Since 05/15/2015. A replacement is available for this system. This system will no longer be supported, or developed further. All functionality has been maintained and furthered in the new system. The code can be found at: https://github.com/kevinkabatra/PHP-PDO-Library. 
+
 # Dynamic-PHP-PDO
 Boilerplate for dynamic use of PHP Data Objects (PDO) through the use of arrays.
 
