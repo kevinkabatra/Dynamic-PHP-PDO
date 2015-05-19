@@ -1,6 +1,12 @@
 <?php
 
+/**
+ * @Deprecated - Since 05/15/2015. A replacement is available for this system.
+ * This system will no longer be supported, or developed further. All 
+ * functionality has been maintained and furthered in the new system. The code
+ * can be found at: https://github.com/kevinkabatra/PHP-PDO-Library. 
 /* 
+ * 
  * Copyright (c) 2015, Kevin Kabatra 
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without
